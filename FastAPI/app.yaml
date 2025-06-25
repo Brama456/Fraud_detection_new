@@ -1,0 +1,11 @@
+runtime: python311
+entrypoint: uvicorn main:app --host 0.0.0.0 --port $PORT
+
+instance_class: F2
+
+env_variables:
+  MODEL_PATH: "xgb_fraud_pipeline.joblib"
+
+handlers:
+- url: /.*
+  script: auto

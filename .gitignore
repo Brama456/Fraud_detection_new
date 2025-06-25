@@ -1,4 +1,16 @@
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 .env
-gcp-key.json
+.env.*
+*.db
+.DS_Store
+.idea/
+.vscode/
+*.joblib
+*.pkl
+latency_logs.csv
+prediction_log.jsonl
+drift_report.html
+reference_data.csv
