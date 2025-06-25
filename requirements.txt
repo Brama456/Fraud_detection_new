@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+joblib
+pandas
+xgboost==3.0.2
+scikit-learn==1.6.1
+streamlit
+numpy
+matplotlib
+lime
