@@ -4,6 +4,7 @@ import joblib
 import pandas as pd
 
 app = FastAPI()
+
 model = joblib.load("xgb_fraud_pipeline.joblib")
 
 class ClaimInput(BaseModel):
@@ -59,3 +60,6 @@ def predict_fraud(data: ClaimInput):
     prob = model.predict_proba(df)[0][1]
     prediction = int(prob >= 0.5)
     return {"prediction": prediction, "probability": float(prob)}
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the Insurance Fraud Detection API. Use POST /predict with claim data."}

@@ -1,8 +1,9 @@
 streamlit
 pandas
 joblib
-numpy
+numpy==1.26.4
 matplotlib
 lime
-evidently
+evidently==0.3.2
 scikit-learn
+requests

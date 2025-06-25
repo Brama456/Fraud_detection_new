@@ -1,11 +1,10 @@
-runtime: python311
-entrypoint: uvicorn main:app --host 0.0.0.0 --port $PORT
+service: fastapi
+runtime: custom
+env: flex
 
-instance_class: F2
+entrypoint: uvicorn main:app --host=0.0.0.0 --port=$PORT
 
-env_variables:
-  MODEL_PATH: "xgb_fraud_pipeline.joblib"
-
-handlers:
-- url: /.*
-  script: auto
+resources:
+  cpu: 1
+  memory_gb: 1
+  disk_size_gb: 10

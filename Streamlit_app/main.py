@@ -1,59 +1,149 @@
-from fastapi import FastAPI, Request
-from pydantic import BaseModel
-import joblib
+import streamlit as st
+import requests
 import pandas as pd
+import time, json, os
+from datetime import datetime
+from evidently.report import Report
+from evidently.metrics import DataDriftPreset
 
-app = FastAPI()
-model = joblib.load("xgb_fraud_pipeline.joblib")
+st.set_page_config(page_title="Insurance Fraud Detector", layout="centered")
+st.title("Insurance Claim Fraud Prediction")
+st.markdown("Enter claim details below:")
 
-class ClaimInput(BaseModel):
-    claim_id: str
-    customer_id: str
-    vehicle_type: str
-    vehicle_make: str
-    vehicle_model: str
-    vehicle_age: int
-    engine_capacity: int
-    registration_zone: str
-    coverage_type: str
-    ncb_percentage: int
-    add_ons: int
-    policy_tenure: int
-    claim_duration: int
-    vehicle_ownership_years: int
-    age: int
-    gender: str
-    driving_experience: int
-    previous_claims: int
-    customer_tenure: int
-    claim_channel: str
-    incident_time: str
-    claim_submission_delay: int
-    location_type: str
-    reported_to_police: str
-    damage_severity: str
-    driver_at_fault: str
-    odometer_reading: int
-    idv: int
-    claim_amount: int
-    repair_cost_estimate: int
-    claim_history: str
-    description_of_current_damage: str
+# Input form (no sliders)
+claim_id = st.text_input("Claim ID", "CLM001")
+customer_id = st.text_input("Customer ID", "CUST001")
+vehicle_type = st.selectbox("Vehicle Type", ['Sedan', 'SUV', 'Hatchback', 'Truck'])
+vehicle_make = st.selectbox("Vehicle Make", ['Toyota', 'Honda', 'Ford', 'Hyundai'])
+vehicle_model = st.text_input("Vehicle Model", "Corolla")
+vehicle_age = st.number_input("Vehicle Age (years)", 0, 50, 5)
+engine_capacity = st.number_input("Engine Capacity (cc)", 600, 6000, 1500)
+registration_zone = st.selectbox("Registration Zone", ['A', 'B', 'C'])
+coverage_type = st.selectbox("Coverage Type", ['comprehensive', 'third-party'])
+ncb_percentage = st.selectbox("NCB Percentage", [0, 20, 25, 35, 45, 50])
+add_ons = st.number_input("Number of Add-ons", 0, 20, 2)
+policy_tenure = st.number_input("Policy Tenure (years)", 1, 50, 3)
+claim_duration = st.number_input("Claim Duration (days)", 1, 365, 30)
+vehicle_ownership_years = st.number_input("Vehicle Ownership (years)", 0, 40, 5)
+age = st.number_input("Customer Age", 18, 100, 35)
+gender = st.selectbox("Gender", ['male', 'female'])
+driving_experience = st.number_input("Driving Experience (years)", 0, 80, 10)
+previous_claims = st.number_input("Previous Claims", 0, 50, 1)
+customer_tenure = st.number_input("Customer Tenure (years)", 0, 50, 6)
+claim_channel = st.selectbox("Claim Channel", ['Online', 'Agent', 'Branch'])
+incident_time = st.selectbox("Incident Time", ['day', 'night'])
+claim_submission_delay = st.number_input("Claim Submission Delay (days)", 0, 90, 2)
+location_type = st.selectbox("Incident Location Type", ['urban', 'rural', 'highway'])
+reported_to_police = st.selectbox("Reported to Police", ['yes', 'no'])
+damage_severity = st.selectbox("Damage Severity", ['minor', 'moderate', 'severe'])
+driver_at_fault = st.selectbox("Driver At Fault", ['yes', 'no'])
+odometer_reading = st.number_input("Odometer Reading (km)", 0, 500000, 40000)
+idv = st.number_input("Insured Declared Value (INR)", 10000, 10000000, 800000)
+claim_amount = st.number_input("Claim Amount (INR)", 1000, 10000000, 100000)
+repair_cost_estimate = st.number_input("Repair Cost Estimate (INR)", 1000, 10000000, 75000)
+claim_history = st.text_area("Claim History", "Had 1 minor claim(s) in the past.")
+description_of_current_damage = st.text_area("Current Damage", "Scratches on the side door after parking mishap.")
 
-@app.post("/predict")
-def predict(data: ClaimInput):
-    input_df = pd.DataFrame([data.dict()])
-    # Add engineered features (same logic as streamlit)
-    input_df['experience_age_ratio'] = input_df['driving_experience'] / input_df['age']
-    input_df['claim_to_idv_ratio'] = input_df['claim_amount'] / input_df['idv']
-    input_df['repair_to_claim_ratio'] = input_df['repair_cost_estimate'] / input_df['claim_amount']
-    input_df['vehicle_value_per_year'] = input_df['idv'] / (input_df['vehicle_age'] + 1)
-    input_df['claim_amount_per_year'] = input_df['claim_amount'] / (input_df['policy_tenure'] + 1)
-    input_df['previous_claim_ratio'] = input_df['previous_claims'] / (input_df['customer_tenure'] + 1)
-    input_df['claim_delay_weighted'] = input_df['claim_submission_delay'] / (input_df['claim_duration'] + 1)
-    input_df['severity_score'] = input_df['damage_severity'].map({'minor': 1, 'moderate': 2, 'severe': 3})
-    input_df['coverage_risk_score'] = input_df['coverage_type'].map({'third-party': 2, 'comprehensive': 1})
-    input_df['channel_risk_score'] = input_df['claim_channel'].map({'Online': 1.5, 'Agent': 1.0, 'Branch': 0.5})
+# Prepare input
+input_data = {
+    "claim_id": claim_id,
+    "customer_id": customer_id,
+    "vehicle_type": vehicle_type,
+    "vehicle_make": vehicle_make,
+    "vehicle_model": vehicle_model,
+    "vehicle_age": vehicle_age,
+    "engine_capacity": engine_capacity,
+    "registration_zone": registration_zone,
+    "coverage_type": coverage_type,
+    "ncb_percentage": ncb_percentage,
+    "add_ons": add_ons,
+    "policy_tenure": policy_tenure,
+    "claim_duration": claim_duration,
+    "vehicle_ownership_years": vehicle_ownership_years,
+    "age": age,
+    "gender": gender,
+    "driving_experience": driving_experience,
+    "previous_claims": previous_claims,
+    "customer_tenure": customer_tenure,
+    "claim_channel": claim_channel,
+    "incident_time": incident_time,
+    "claim_submission_delay": claim_submission_delay,
+    "location_type": location_type,
+    "reported_to_police": reported_to_police,
+    "damage_severity": damage_severity,
+    "driver_at_fault": driver_at_fault,
+    "odometer_reading": odometer_reading,
+    "idv": idv,
+    "claim_amount": claim_amount,
+    "repair_cost_estimate": repair_cost_estimate,
+    "claim_history": claim_history,
+    "description_of_current_damage": description_of_current_damage
+}
 
-    pred_prob = model.predict_proba(input_df)[0][1]
-    return {"fraud_probability": float(pred_prob)}
+# Utility functions for latency and drift
+
+def track_latency(start_time, file_path="latency_logs.csv"):
+    latency = time.time() - start_time
+    with open(file_path, "a") as f:
+        f.write(f"{datetime.now()},{latency:.4f}\n")
+    return latency
+
+def log_prediction(input_dict, pred_prob, prediction, log_file="prediction_log.jsonl"):
+    log = {
+        "timestamp": str(datetime.now()),
+        "input": input_dict,
+        "pred_prob": float(pred_prob),
+        "prediction": int(prediction)
+    }
+    with open(log_file, "a") as f:
+        f.write(json.dumps(log) + "\n")
+
+def run_drift_check(current_data, reference_path="reference_data.csv", html_output="drift_report.html"):
+    if not os.path.exists(reference_path):
+        st.warning("Reference data not found for drift check.")
+        return None
+    reference_data = pd.read_csv(reference_path)
+    report = Report(metrics=[DataDriftPreset()])
+    report.run(reference_data=reference_data, current_data=current_data)
+    report.save_html(html_output)
+    return report
+
+# Prediction
+if st.button("Predict Fraud"):
+    with st.spinner("Analyzing claim..."):
+        try:
+            df_input = pd.DataFrame([input_data])
+            start_time = time.time()
+
+            response = requests.post(
+                "https://fastapi-dot-fraud-detection-464016.uc.r.appspot.com/predict",
+                json=input_data
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                pred = result["prediction"]
+                prob = result["probability"]
+
+                elapsed = track_latency(start_time)
+                log_prediction(input_data, prob, pred)
+
+                st.markdown("### 🔍 Prediction Result")
+                if pred == 1:
+                    st.error(f"🚨 Fraudulent Claim Detected! (Confidence: {prob * 100:.2f}%)")
+                else:
+                    st.success(f"✅ Genuine Claim (Confidence: {(1 - prob) * 100:.2f}%)")
+                st.info(f"🕒 Prediction Time: {elapsed:.4f} seconds")
+
+                if elapsed > 2:
+                    st.warning("⚠️ High latency detected. Consider reviewing model/server.")
+
+                drift_report = run_drift_check(df_input)
+                if drift_report:
+                    with open("drift_report.html", "r", encoding="utf-8") as f:
+                        st.components.v1.html(f.read(), height=600, scrolling=True)
+            else:
+                st.error(f"❌ Error {response.status_code}: {response.text}")
+
+        except Exception as e:
+            st.error(f"❌ Prediction failed: {e}")
