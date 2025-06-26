@@ -89,7 +89,7 @@ if st.button("Predict Fraud"):
         try:
             start_time = time.time()
             response = requests.post(
-                "https://fastapi-dot-fraud-detection-464016.uc.r.appspot.com/predict",
+                "https://fastapi-dot-fraud-detection-new.uc.r.appspot.com/predict",
                 json=data
             )
 

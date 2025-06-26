@@ -2,6 +2,7 @@ runtime: custom
 env: flex
 
 entrypoint: streamlit run main.py --server.port=$PORT
+service_account: streamlit-deployer@fraud-detection-new.iam.gserviceaccount.com
 
 instance_class: F2
 
