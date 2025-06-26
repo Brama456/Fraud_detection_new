@@ -1,0 +1,28 @@
+name: Deploy Streamlit to App Engine
+
+on:
+  push:
+    paths:
+      - 'Streamlit_app/**'
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: your-gcp-project-id
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Deploy to App Engine
+        run: |
+          cd Streamlit_app
+          gcloud app deploy --quiet

@@ -1,16 +1,14 @@
 import streamlit as st
 import requests
 import pandas as pd
-import time, json, os
+import time
 from datetime import datetime
-from evidently.report import Report
-from evidently.metrics import DataDriftPreset
 
 st.set_page_config(page_title="Insurance Fraud Detector", layout="centered")
 st.title("Insurance Claim Fraud Prediction")
 st.markdown("Enter claim details below:")
 
-# Input form (no sliders)
+# Input form
 claim_id = st.text_input("Claim ID", "CLM001")
 customer_id = st.text_input("Customer ID", "CUST001")
 vehicle_type = st.selectbox("Vehicle Type", ['Sedan', 'SUV', 'Hatchback', 'Truck'])
@@ -45,7 +43,7 @@ claim_history = st.text_area("Claim History", "Had 1 minor claim(s) in the past.
 description_of_current_damage = st.text_area("Current Damage", "Scratches on the side door after parking mishap.")
 
 # Prepare input
-input_data = {
+data = {
     "claim_id": claim_id,
     "customer_id": customer_id,
     "vehicle_type": vehicle_type,
@@ -80,53 +78,26 @@ input_data = {
     "description_of_current_damage": description_of_current_damage
 }
 
-# Utility functions for latency and drift
-
-def track_latency(start_time, file_path="latency_logs.csv"):
+# Simple latency function (UI only)
+def track_latency(start_time):
     latency = time.time() - start_time
-    with open(file_path, "a") as f:
-        f.write(f"{datetime.now()},{latency:.4f}\n")
     return latency
 
-def log_prediction(input_dict, pred_prob, prediction, log_file="prediction_log.jsonl"):
-    log = {
-        "timestamp": str(datetime.now()),
-        "input": input_dict,
-        "pred_prob": float(pred_prob),
-        "prediction": int(prediction)
-    }
-    with open(log_file, "a") as f:
-        f.write(json.dumps(log) + "\n")
-
-def run_drift_check(current_data, reference_path="reference_data.csv", html_output="drift_report.html"):
-    if not os.path.exists(reference_path):
-        st.warning("Reference data not found for drift check.")
-        return None
-    reference_data = pd.read_csv(reference_path)
-    report = Report(metrics=[DataDriftPreset()])
-    report.run(reference_data=reference_data, current_data=current_data)
-    report.save_html(html_output)
-    return report
-
-# Prediction
+# Prediction call
 if st.button("Predict Fraud"):
     with st.spinner("Analyzing claim..."):
         try:
-            df_input = pd.DataFrame([input_data])
             start_time = time.time()
-
             response = requests.post(
                 "https://fastapi-dot-fraud-detection-464016.uc.r.appspot.com/predict",
-                json=input_data
+                json=data
             )
 
             if response.status_code == 200:
                 result = response.json()
                 pred = result["prediction"]
                 prob = result["probability"]
-
                 elapsed = track_latency(start_time)
-                log_prediction(input_data, prob, pred)
 
                 st.markdown("### 🔍 Prediction Result")
                 if pred == 1:
@@ -135,15 +106,9 @@ if st.button("Predict Fraud"):
                     st.success(f"✅ Genuine Claim (Confidence: {(1 - prob) * 100:.2f}%)")
                 st.info(f"🕒 Prediction Time: {elapsed:.4f} seconds")
 
-                if elapsed > 2:
+                if elapsed > 5:
                     st.warning("⚠️ High latency detected. Consider reviewing model/server.")
-
-                drift_report = run_drift_check(df_input)
-                if drift_report:
-                    with open("drift_report.html", "r", encoding="utf-8") as f:
-                        st.components.v1.html(f.read(), height=600, scrolling=True)
             else:
                 st.error(f"❌ Error {response.status_code}: {response.text}")
-
         except Exception as e:
             st.error(f"❌ Prediction failed: {e}")
